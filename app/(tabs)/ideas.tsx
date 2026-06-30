@@ -1,47 +1,30 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-type Idea = {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  date: string;
-};
+import { colors } from '@/constants/colors';
+import { Idea, useAppStore } from '@/store/useAppStore';
 
-const STORAGE_KEY = 'ideas_records';
 const categories = ['Бизнес', 'Финансы', 'Court Hunter', 'Baraka', 'Личное', 'Другое'];
 
 export default function IdeasScreen() {
-  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const ideas = useAppStore((state) => state.ideas);
+  const addIdeaToStore = useAppStore((state) => state.addIdea);
+  const deleteIdeaFromStore = useAppStore((state) => state.deleteIdea);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Другое');
-
-  useEffect(() => {
-    loadIdeas();
-  }, []);
-
-  async function loadIdeas() {
-    const data = await AsyncStorage.getItem(STORAGE_KEY);
-    if (data) setIdeas(JSON.parse(data));
-  }
-
-  async function saveIdeas(nextIdeas: Idea[]) {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextIdeas));
-  }
 
   function resetForm() {
     setTitle('');
@@ -49,7 +32,7 @@ export default function IdeasScreen() {
     setCategory('Другое');
   }
 
-  function addIdea() {
+  async function addIdea() {
     if (!title.trim()) return Alert.alert('Ошибка', 'Введите название идеи');
 
     const newIdea: Idea = {
@@ -60,9 +43,7 @@ export default function IdeasScreen() {
       date: new Date().toLocaleDateString('ru-RU'),
     };
 
-    const updatedIdeas = [newIdea, ...ideas];
-    setIdeas(updatedIdeas);
-    saveIdeas(updatedIdeas);
+    await addIdeaToStore(newIdea);
     resetForm();
     setModalVisible(false);
   }
@@ -73,11 +54,7 @@ export default function IdeasScreen() {
       {
         text: 'Удалить',
         style: 'destructive',
-        onPress: () => {
-          const updatedIdeas = ideas.filter((idea) => idea.id !== id);
-          setIdeas(updatedIdeas);
-          saveIdeas(updatedIdeas);
-        },
+        onPress: () => deleteIdeaFromStore(id),
       },
     ]);
   }
@@ -91,7 +68,7 @@ export default function IdeasScreen() {
         ListHeaderComponent={
           <>
             <Text style={styles.title}>💡 Идеи</Text>
-            <Text style={styles.subtitle}>Быстро сохраняй мысли, проекты и инсайты</Text>
+            <Text style={styles.subtitle}>Быстро сохраняй мысли, планы и инсайты</Text>
 
             <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
               <Text style={styles.addButtonText}>＋ Добавить идею</Text>
@@ -120,7 +97,7 @@ export default function IdeasScreen() {
           <Text style={styles.label}>Название</Text>
           <TextInput
             style={styles.input}
-            placeholder="Например: функция для Court Hunter"
+            placeholder="Например: функция для Life OS"
             value={title}
             onChangeText={setTitle}
           />
@@ -169,21 +146,21 @@ export default function IdeasScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 20, paddingTop: 64, paddingBottom: 120 },
-  title: { fontSize: 30, fontWeight: '900', color: '#0f172a' },
-  subtitle: { fontSize: 14, color: '#64748b', marginTop: 6, marginBottom: 22 },
+  title: { fontSize: 30, fontWeight: '900', color: colors.text },
+  subtitle: { fontSize: 14, color: colors.muted, marginTop: 6, marginBottom: 22 },
   addButton: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: colors.orange,
     borderRadius: 18,
     padding: 16,
     alignItems: 'center',
     marginBottom: 24,
   },
   addButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  sectionTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', marginBottom: 12 },
+  sectionTitle: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 12 },
   emptyText: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 12 },
+  card: { backgroundColor: colors.card, borderRadius: 20, padding: 16, marginBottom: 12 },
   badge: {
     alignSelf: 'flex-start',
     backgroundColor: '#fef3c7',
@@ -193,14 +170,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   badgeText: { color: '#92400e', fontSize: 12, fontWeight: '800' },
-  cardTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
-  cardDescription: { fontSize: 13, color: '#64748b', marginTop: 8, lineHeight: 20 },
+  cardTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
+  cardDescription: { fontSize: 13, color: colors.muted, marginTop: 8, lineHeight: 20 },
   date: { fontSize: 12, color: '#94a3b8', marginTop: 12 },
   modal: { flex: 1, backgroundColor: '#fff', padding: 24, paddingTop: 70 },
-  modalTitle: { fontSize: 28, fontWeight: '900', color: '#0f172a', marginBottom: 20 },
-  label: { fontSize: 13, fontWeight: '700', color: '#64748b', marginTop: 18, marginBottom: 8 },
+  modalTitle: { fontSize: 28, fontWeight: '900', color: colors.text, marginBottom: 20 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.muted, marginTop: 18, marginBottom: 8 },
   input: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.bg,
     borderRadius: 16,
     padding: 15,
     fontSize: 16,
@@ -213,13 +190,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.soft,
   },
-  categoryActive: { backgroundColor: '#111827' },
-  categoryText: { color: '#64748b', fontWeight: '700' },
+  categoryActive: { backgroundColor: colors.black },
+  categoryText: { color: colors.muted, fontWeight: '700' },
   categoryActiveText: { color: '#fff' },
   saveButton: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.black,
     borderRadius: 18,
     padding: 17,
     alignItems: 'center',

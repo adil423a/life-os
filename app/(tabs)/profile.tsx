@@ -1,29 +1,32 @@
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/AppCard';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { colors } from '@/constants/colors';
-import { loadDashboardData } from '@/storage/dashboard';
+import { useAppStore } from '@/store/useAppStore';
 
 export default function ProfileScreen() {
-  const [data, setData] = useState({
-    balance: 0,
-    income: 0,
-    expense: 0,
-    ideasCount: 0,
-    goalsCount: 0,
-    latestFinance: [],
-    latestIdeas: [],
-    latestGoals: [],
-  });
+  const finance = useAppStore((state) => state.finance);
+  const ideas = useAppStore((state) => state.ideas);
+  const goals = useAppStore((state) => state.goals);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadDashboardData().then(setData);
-    }, [])
-  );
+  const stats = useMemo(() => {
+    const income = finance
+      .filter((item) => item.type === 'income')
+      .reduce((sum, item) => sum + item.amount, 0);
+
+    const expense = finance
+      .filter((item) => item.type === 'expense')
+      .reduce((sum, item) => sum + item.amount, 0);
+
+    return {
+      balance: income - expense,
+      expense,
+      ideasCount: ideas.length,
+      activeGoals: goals.filter((goal) => goal.progress < 100).length,
+    };
+  }, [finance, ideas, goals]);
 
   function money(value: number) {
     return value.toLocaleString('ru-RU') + ' ₸';
@@ -39,7 +42,7 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={styles.name}>Адиль</Text>
-        <Text style={styles.role}>Life OS · v0.2</Text>
+        <Text style={styles.role}>Life OS · v0.3</Text>
       </AppCard>
 
       <Text style={styles.sectionTitle}>Статистика</Text>
@@ -47,38 +50,28 @@ export default function ProfileScreen() {
       <View style={styles.grid}>
         <AppCard style={styles.statCard}>
           <Text style={styles.statIcon}>💰</Text>
-          <Text style={styles.statValue}>{money(data.balance)}</Text>
+          <Text style={styles.statValue}>{money(stats.balance)}</Text>
           <Text style={styles.statLabel}>Баланс</Text>
         </AppCard>
 
         <AppCard style={styles.statCard}>
           <Text style={styles.statIcon}>💡</Text>
-          <Text style={styles.statValue}>{data.ideasCount}</Text>
+          <Text style={styles.statValue}>{stats.ideasCount}</Text>
           <Text style={styles.statLabel}>Идей</Text>
         </AppCard>
 
         <AppCard style={styles.statCard}>
           <Text style={styles.statIcon}>🎯</Text>
-          <Text style={styles.statValue}>{data.goalsCount}</Text>
+          <Text style={styles.statValue}>{stats.activeGoals}</Text>
           <Text style={styles.statLabel}>Активных целей</Text>
         </AppCard>
 
         <AppCard style={styles.statCard}>
           <Text style={styles.statIcon}>📉</Text>
-          <Text style={styles.statValue}>{money(data.expense)}</Text>
+          <Text style={styles.statValue}>{money(stats.expense)}</Text>
           <Text style={styles.statLabel}>Расходы</Text>
         </AppCard>
       </View>
-
-      <Text style={styles.sectionTitle}>Проекты</Text>
-
-      <AppCard>
-        <ProjectRow icon="🎾" title="Court Hunter" progress="72%" />
-        <View style={styles.divider} />
-        <ProjectRow icon="📦" title="Baraka" progress="86%" />
-        <View style={styles.divider} />
-        <ProjectRow icon="🏠" title="Личное" progress="41%" />
-      </AppCard>
 
       <Text style={styles.sectionTitle}>Настройки</Text>
 
@@ -92,19 +85,6 @@ export default function ProfileScreen() {
         <SettingsRow icon="☁️" title="Резервная копия" value="Скоро" />
       </AppCard>
     </ScrollView>
-  );
-}
-
-function ProjectRow({ icon, title, progress }: { icon: string; title: string; progress: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowIcon}>{icon}</Text>
-      <View style={styles.rowInfo}>
-        <Text style={styles.rowTitle}>{title}</Text>
-        <Text style={styles.rowDesc}>Проект · прогресс {progress}</Text>
-      </View>
-      <Text style={styles.rowValue}>{progress}</Text>
-    </View>
   );
 }
 
@@ -156,8 +136,6 @@ const styles = StyleSheet.create({
   rowIcon: { fontSize: 22, marginRight: 12 },
   rowInfo: { flex: 1 },
   rowTitle: { fontSize: 14, fontWeight: '900', color: colors.text },
-  rowDesc: { fontSize: 12, color: '#94a3b8', marginTop: 3 },
-  rowValue: { fontSize: 14, fontWeight: '900', color: colors.purple },
   settingValue: { fontSize: 13, fontWeight: '800', color: colors.muted },
   divider: { height: 1, backgroundColor: colors.soft, marginVertical: 12 },
 });

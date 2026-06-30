@@ -1,61 +1,33 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-type Goal = {
-  id: string;
-  title: string;
-  target: string;
-  deadline: string;
-  progress: number;
-  category: string;
-  date: string;
-};
-
-const STORAGE_KEY = 'goals_records';
+import { colors } from '@/constants/colors';
+import { Goal, useAppStore } from '@/store/useAppStore';
 
 const categories = ['Финансы', 'Бизнес', 'Court Hunter', 'Baraka', 'Здоровье', 'Личное'];
 
 export default function GoalsScreen() {
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
+  const goals = useAppStore((state) => state.goals);
+  const addGoalToStore = useAppStore((state) => state.addGoal);
+  const deleteGoalFromStore = useAppStore((state) => state.deleteGoal);
+  const updateGoalProgress = useAppStore((state) => state.updateGoalProgress);
 
+  const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [target, setTarget] = useState('');
   const [deadline, setDeadline] = useState('');
   const [progress, setProgress] = useState('0');
   const [category, setCategory] = useState('Личное');
-
-  useEffect(() => {
-    loadGoals();
-  }, []);
-
-  async function loadGoals() {
-    try {
-      const data = await AsyncStorage.getItem(STORAGE_KEY);
-      if (data) setGoals(JSON.parse(data));
-    } catch {
-      console.log('Ошибка загрузки целей');
-    }
-  }
-
-  async function saveGoals(nextGoals: Goal[]) {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextGoals));
-    } catch {
-      console.log('Ошибка сохранения целей');
-    }
-  }
 
   const activeGoals = goals.filter((g) => g.progress < 100).length;
   const completedGoals = goals.filter((g) => g.progress >= 100).length;
@@ -74,7 +46,7 @@ export default function GoalsScreen() {
     setCategory('Личное');
   }
 
-  function addGoal() {
+  async function addGoal() {
     if (!title.trim()) return Alert.alert('Ошибка', 'Введите название цели');
 
     const parsedProgress = Math.min(100, Math.max(0, Number(progress) || 0));
@@ -89,26 +61,9 @@ export default function GoalsScreen() {
       date: new Date().toLocaleDateString('ru-RU'),
     };
 
-    const updatedGoals = [newGoal, ...goals];
-
-    setGoals(updatedGoals);
-    saveGoals(updatedGoals);
+    await addGoalToStore(newGoal);
     resetForm();
     setModalVisible(false);
-  }
-
-  function changeProgress(id: string, delta: number) {
-    const updatedGoals = goals.map((goal) => {
-      if (goal.id !== id) return goal;
-
-      return {
-        ...goal,
-        progress: Math.min(100, Math.max(0, goal.progress + delta)),
-      };
-    });
-
-    setGoals(updatedGoals);
-    saveGoals(updatedGoals);
   }
 
   function deleteGoal(id: string) {
@@ -117,19 +72,15 @@ export default function GoalsScreen() {
       {
         text: 'Удалить',
         style: 'destructive',
-        onPress: () => {
-          const updatedGoals = goals.filter((goal) => goal.id !== id);
-          setGoals(updatedGoals);
-          saveGoals(updatedGoals);
-        },
+        onPress: () => deleteGoalFromStore(id),
       },
     ]);
   }
 
   function getProgressColor(value: number) {
-    if (value >= 80) return '#10b981';
-    if (value >= 40) return '#3b82f6';
-    return '#f59e0b';
+    if (value >= 80) return colors.green;
+    if (value >= 40) return colors.blue;
+    return colors.orange;
   }
 
   return (
@@ -198,11 +149,11 @@ export default function GoalsScreen() {
             </View>
 
             <View style={styles.controls}>
-              <TouchableOpacity style={styles.controlButton} onPress={() => changeProgress(item.id, -10)}>
+              <TouchableOpacity style={styles.controlButton} onPress={() => updateGoalProgress(item.id, -10)}>
                 <Text style={styles.controlText}>−10%</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.controlButton} onPress={() => changeProgress(item.id, 10)}>
+              <TouchableOpacity style={styles.controlButton} onPress={() => updateGoalProgress(item.id, 10)}>
                 <Text style={styles.controlText}>+10%</Text>
               </TouchableOpacity>
             </View>
@@ -282,23 +233,23 @@ export default function GoalsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 20, paddingTop: 64, paddingBottom: 120 },
-  title: { fontSize: 30, fontWeight: '900', color: '#0f172a' },
-  subtitle: { fontSize: 14, color: '#64748b', marginTop: 6, marginBottom: 22 },
+  title: { fontSize: 30, fontWeight: '900', color: colors.text },
+  subtitle: { fontSize: 14, color: colors.muted, marginTop: 6, marginBottom: 22 },
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 18,
     padding: 14,
   },
-  statValue: { fontSize: 20, fontWeight: '900', color: '#0f172a' },
-  statLabel: { fontSize: 11, color: '#64748b', marginTop: 5 },
+  statValue: { fontSize: 20, fontWeight: '900', color: colors.text },
+  statLabel: { fontSize: 11, color: colors.muted, marginTop: 5 },
 
   addButton: {
-    backgroundColor: '#8b5cf6',
+    backgroundColor: colors.purple,
     borderRadius: 18,
     padding: 16,
     alignItems: 'center',
@@ -306,10 +257,10 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
-  sectionTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', marginBottom: 12 },
+  sectionTitle: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 12 },
   emptyText: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 20 },
 
-  card: { backgroundColor: '#fff', borderRadius: 22, padding: 16, marginBottom: 12 },
+  card: { backgroundColor: colors.card, borderRadius: 22, padding: 16, marginBottom: 12 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   badge: {
     backgroundColor: '#ede9fe',
@@ -319,12 +270,12 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: '#5b21b6', fontSize: 12, fontWeight: '800' },
   progressText: { fontSize: 16, fontWeight: '900' },
-  cardTitle: { fontSize: 17, fontWeight: '900', color: '#0f172a', marginTop: 14 },
-  metaText: { fontSize: 13, color: '#64748b', marginTop: 8 },
+  cardTitle: { fontSize: 17, fontWeight: '900', color: colors.text, marginTop: 14 },
+  metaText: { fontSize: 13, color: colors.muted, marginTop: 8 },
 
   progressBg: {
     height: 9,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.soft,
     borderRadius: 999,
     overflow: 'hidden',
     marginTop: 16,
@@ -334,7 +285,7 @@ const styles = StyleSheet.create({
   controls: { flexDirection: 'row', gap: 10, marginTop: 14 },
   controlButton: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.soft,
     borderRadius: 14,
     padding: 11,
     alignItems: 'center',
@@ -342,11 +293,11 @@ const styles = StyleSheet.create({
   controlText: { color: '#475569', fontWeight: '800' },
 
   modal: { flex: 1, backgroundColor: '#fff', padding: 24, paddingTop: 70 },
-  modalTitle: { fontSize: 28, fontWeight: '900', color: '#0f172a', marginBottom: 20 },
+  modalTitle: { fontSize: 28, fontWeight: '900', color: colors.text, marginBottom: 20 },
 
-  label: { fontSize: 13, fontWeight: '700', color: '#64748b', marginTop: 18, marginBottom: 8 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.muted, marginTop: 18, marginBottom: 8 },
   input: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.bg,
     borderRadius: 16,
     padding: 15,
     fontSize: 16,
@@ -359,14 +310,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.soft,
   },
-  categoryActive: { backgroundColor: '#111827' },
-  categoryText: { color: '#64748b', fontWeight: '700' },
+  categoryActive: { backgroundColor: colors.black },
+  categoryText: { color: colors.muted, fontWeight: '700' },
   categoryActiveText: { color: '#fff' },
 
   saveButton: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.black,
     borderRadius: 18,
     padding: 17,
     alignItems: 'center',

@@ -1,40 +1,36 @@
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/AppCard';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { colors } from '@/constants/colors';
-import { loadDashboardData } from '@/storage/dashboard';
-
-type DashboardData = {
-  balance: number;
-  income: number;
-  expense: number;
-  ideasCount: number;
-  goalsCount: number;
-  latestFinance: any[];
-  latestIdeas: any[];
-  latestGoals: any[];
-};
+import { useAppStore } from '@/store/useAppStore';
 
 export default function HomeScreen() {
-  const [data, setData] = useState<DashboardData>({
-    balance: 0,
-    income: 0,
-    expense: 0,
-    ideasCount: 0,
-    goalsCount: 0,
-    latestFinance: [],
-    latestIdeas: [],
-    latestGoals: [],
-  });
+  const finance = useAppStore((state) => state.finance);
+  const ideas = useAppStore((state) => state.ideas);
+  const goals = useAppStore((state) => state.goals);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadDashboardData().then(setData);
-    }, [])
-  );
+  const data = useMemo(() => {
+    const income = finance
+      .filter((item) => item.type === 'income')
+      .reduce((sum, item) => sum + item.amount, 0);
+
+    const expense = finance
+      .filter((item) => item.type === 'expense')
+      .reduce((sum, item) => sum + item.amount, 0);
+
+    return {
+      balance: income - expense,
+      income,
+      expense,
+      ideasCount: ideas.length,
+      goalsCount: goals.filter((goal) => goal.progress < 100).length,
+      latestFinance: finance.slice(0, 3),
+      latestIdeas: ideas.slice(0, 3),
+      latestGoals: goals.slice(0, 3),
+    };
+  }, [finance, ideas, goals]);
 
   function money(value: number) {
     return value.toLocaleString('ru-RU') + ' ₸';

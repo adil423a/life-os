@@ -1,58 +1,31 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-type FinanceRecord = {
-  id: string;
-  title: string;
-  amount: number;
-  type: 'income' | 'expense';
-  category: string;
-  date: string;
-};
-
-const STORAGE_KEY = 'finance_records';
+import { colors } from '@/constants/colors';
+import { FinanceRecord, useAppStore } from '@/store/useAppStore';
 
 const categories = ['Еда', 'Транспорт', 'Бизнес', 'Теннис', 'Дом', 'Другое'];
 
 export default function FinanceScreen() {
-  const [records, setRecords] = useState<FinanceRecord[]>([]);
+  const records = useAppStore((state) => state.finance);
+  const addFinanceRecord = useAppStore((state) => state.addFinanceRecord);
+  const deleteFinanceRecord = useAppStore((state) => state.deleteFinanceRecord);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [recordType, setRecordType] = useState<'income' | 'expense'>('expense');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Другое');
-
-  useEffect(() => {
-    loadRecords();
-  }, []);
-
-  async function loadRecords() {
-    try {
-      const data = await AsyncStorage.getItem(STORAGE_KEY);
-      if (data) setRecords(JSON.parse(data));
-    } catch {
-      console.log('Ошибка загрузки финансов');
-    }
-  }
-
-  async function saveRecords(nextRecords: FinanceRecord[]) {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextRecords));
-    } catch {
-      console.log('Ошибка сохранения финансов');
-    }
-  }
 
   const totalIncome = useMemo(
     () => records.filter((r) => r.type === 'income').reduce((sum, r) => sum + r.amount, 0),
@@ -77,7 +50,7 @@ export default function FinanceScreen() {
     setRecordType('expense');
   }
 
-  function addRecord() {
+  async function addRecord() {
     const parsedAmount = Number(amount.replace(/\s/g, '').replace(',', '.'));
 
     if (!title.trim()) return Alert.alert('Ошибка', 'Введите название');
@@ -92,10 +65,7 @@ export default function FinanceScreen() {
       date: new Date().toLocaleDateString('ru-RU'),
     };
 
-    const updatedRecords = [newRecord, ...records];
-
-    setRecords(updatedRecords);
-    saveRecords(updatedRecords);
+    await addFinanceRecord(newRecord);
     resetForm();
     setModalVisible(false);
   }
@@ -106,11 +76,7 @@ export default function FinanceScreen() {
       {
         text: 'Удалить',
         style: 'destructive',
-        onPress: () => {
-          const updatedRecords = records.filter((r) => r.id !== id);
-          setRecords(updatedRecords);
-          saveRecords(updatedRecords);
-        },
+        onPress: () => deleteFinanceRecord(id),
       },
     ]);
   }
@@ -252,13 +218,13 @@ export default function FinanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 20, paddingTop: 64, paddingBottom: 120 },
-  title: { fontSize: 30, fontWeight: '900', color: '#0f172a' },
-  subtitle: { fontSize: 14, color: '#64748b', marginTop: 6, marginBottom: 22 },
+  title: { fontSize: 30, fontWeight: '900', color: colors.text },
+  subtitle: { fontSize: 14, color: colors.muted, marginTop: 6, marginBottom: 22 },
 
   balanceCard: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.black,
     borderRadius: 26,
     padding: 22,
     marginBottom: 18,
@@ -268,11 +234,11 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', gap: 12, marginTop: 22 },
   summaryItem: { flex: 1, backgroundColor: '#1f2937', borderRadius: 18, padding: 14 },
   summaryLabel: { color: '#94a3b8', fontSize: 12 },
-  incomeText: { color: '#10b981', fontSize: 15, fontWeight: '800', marginTop: 6 },
-  expenseText: { color: '#ef4444', fontSize: 15, fontWeight: '800', marginTop: 6 },
+  incomeText: { color: colors.green, fontSize: 15, fontWeight: '800', marginTop: 6 },
+  expenseText: { color: colors.red, fontSize: 15, fontWeight: '800', marginTop: 6 },
 
   addButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: colors.blue,
     borderRadius: 18,
     padding: 16,
     alignItems: 'center',
@@ -280,11 +246,11 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
-  sectionTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', marginBottom: 12 },
+  sectionTitle: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 12 },
   emptyText: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 20 },
 
   recordCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 18,
     padding: 14,
     marginBottom: 10,
@@ -297,28 +263,28 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 14,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  recordTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
+  recordTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
   recordMeta: { fontSize: 12, color: '#94a3b8', marginTop: 3 },
-  recordIncome: { color: '#10b981', fontSize: 13, fontWeight: '900' },
-  recordExpense: { color: '#ef4444', fontSize: 13, fontWeight: '900' },
+  recordIncome: { color: colors.green, fontSize: 13, fontWeight: '900' },
+  recordExpense: { color: colors.red, fontSize: 13, fontWeight: '900' },
 
   modal: { flex: 1, backgroundColor: '#fff', padding: 24, paddingTop: 70 },
-  modalTitle: { fontSize: 28, fontWeight: '900', color: '#0f172a', marginBottom: 20 },
-  typeSwitch: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 16, padding: 4 },
+  modalTitle: { fontSize: 28, fontWeight: '900', color: colors.text, marginBottom: 20 },
+  typeSwitch: { flexDirection: 'row', backgroundColor: colors.soft, borderRadius: 16, padding: 4 },
   typeButton: { flex: 1, padding: 14, alignItems: 'center', borderRadius: 13 },
-  incomeActive: { backgroundColor: '#10b981' },
-  expenseActive: { backgroundColor: '#ef4444' },
-  typeText: { color: '#64748b', fontWeight: '800' },
+  incomeActive: { backgroundColor: colors.green },
+  expenseActive: { backgroundColor: colors.red },
+  typeText: { color: colors.muted, fontWeight: '800' },
   activeText: { color: '#fff' },
 
-  label: { fontSize: 13, fontWeight: '700', color: '#64748b', marginTop: 18, marginBottom: 8 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.muted, marginTop: 18, marginBottom: 8 },
   input: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.bg,
     borderRadius: 16,
     padding: 15,
     fontSize: 16,
@@ -331,14 +297,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.soft,
   },
-  categoryActive: { backgroundColor: '#111827' },
-  categoryText: { color: '#64748b', fontWeight: '700' },
+  categoryActive: { backgroundColor: colors.black },
+  categoryText: { color: colors.muted, fontWeight: '700' },
   categoryActiveText: { color: '#fff' },
 
   saveButton: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.black,
     borderRadius: 18,
     padding: 17,
     alignItems: 'center',
