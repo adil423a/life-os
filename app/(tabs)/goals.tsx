@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import {
   Alert,
   FlatList,
@@ -17,6 +18,8 @@ import { Goal, useAppStore } from '@/store/useAppStore';
 const categories = ['Финансы', 'Бизнес', 'Court Hunter', 'Baraka', 'Здоровье', 'Личное'];
 
 export default function GoalsScreen() {
+  const params = useLocalSearchParams<{ quick?: string }>();
+
   const goals = useAppStore((state) => state.goals);
   const addGoalToStore = useAppStore((state) => state.addGoal);
   const deleteGoalFromStore = useAppStore((state) => state.deleteGoal);
@@ -29,13 +32,16 @@ export default function GoalsScreen() {
   const [progress, setProgress] = useState('0');
   const [category, setCategory] = useState('Личное');
 
-  const activeGoals = goals.filter((g) => g.progress < 100).length;
-  const completedGoals = goals.filter((g) => g.progress >= 100).length;
+  useEffect(() => {
+    if (params.quick === 'goal') setModalVisible(true);
+  }, [params.quick]);
 
-  const averageProgress = useMemo(() => {
-    if (goals.length === 0) return 0;
-    const total = goals.reduce((sum, goal) => sum + goal.progress, 0);
-    return Math.round(total / goals.length);
+  const stats = useMemo(() => {
+    const active = goals.filter((g) => g.progress < 100).length;
+    const done = goals.filter((g) => g.progress >= 100).length;
+    const avg = goals.length ? Math.round(goals.reduce((s, g) => s + g.progress, 0) / goals.length) : 0;
+
+    return { active, done, avg };
   }, [goals]);
 
   function resetForm() {
@@ -49,14 +55,12 @@ export default function GoalsScreen() {
   async function addGoal() {
     if (!title.trim()) return Alert.alert('Ошибка', 'Введите название цели');
 
-    const parsedProgress = Math.min(100, Math.max(0, Number(progress) || 0));
-
     const newGoal: Goal = {
       id: Date.now().toString(),
       title: title.trim(),
       target: target.trim(),
       deadline: deadline.trim(),
-      progress: parsedProgress,
+      progress: Math.min(100, Math.max(0, Number(progress) || 0)),
       category,
       date: new Date().toLocaleDateString('ru-RU'),
     };
@@ -69,18 +73,8 @@ export default function GoalsScreen() {
   function deleteGoal(id: string) {
     Alert.alert('Удалить цель?', 'Это действие нельзя отменить', [
       { text: 'Отмена', style: 'cancel' },
-      {
-        text: 'Удалить',
-        style: 'destructive',
-        onPress: () => deleteGoalFromStore(id),
-      },
+      { text: 'Удалить', style: 'destructive', onPress: () => deleteGoalFromStore(id) },
     ]);
-  }
-
-  function getProgressColor(value: number) {
-    if (value >= 80) return colors.green;
-    if (value >= 40) return colors.blue;
-    return colors.orange;
   }
 
   return (
@@ -91,62 +85,40 @@ export default function GoalsScreen() {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
-            <Text style={styles.title}>🎯 Цели</Text>
-            <Text style={styles.subtitle}>Отслеживай прогресс по важным направлениям</Text>
-
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{activeGoals}</Text>
-                <Text style={styles.statLabel}>Активные</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{completedGoals}</Text>
-                <Text style={styles.statLabel}>Выполнено</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{averageProgress}%</Text>
-                <Text style={styles.statLabel}>Средний прогресс</Text>
-              </View>
+            <View style={styles.header}>
+              <Text style={styles.kicker}>Прогресс</Text>
+              <Text style={styles.title}>Цели</Text>
             </View>
 
-            <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
-              <Text style={styles.addButtonText}>＋ Добавить цель</Text>
+            <View style={styles.statsRow}>
+              <Stat title="Активные" value={`${stats.active}`} />
+              <Stat title="Готово" value={`${stats.done}`} />
+              <Stat title="Среднее" value={`${stats.avg}%`} />
+            </View>
+
+            <TouchableOpacity style={styles.primaryButton} onPress={() => setModalVisible(true)}>
+              <Text style={styles.primaryButtonText}>Добавить цель</Text>
             </TouchableOpacity>
 
             <Text style={styles.sectionTitle}>Мои цели</Text>
           </>
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>Пока нет целей. Добавь первую.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>Пока нет целей</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onLongPress={() => deleteGoal(item.id)}>
-            <View style={styles.cardHeader}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.category}</Text>
-              </View>
-
-              <Text style={[styles.progressText, { color: getProgressColor(item.progress) }]}>
-                {item.progress}%
-              </Text>
+            <View style={styles.cardTop}>
+              <Text style={styles.goalTitle} numberOfLines={1}>{item.title}</Text>
+              <Text style={styles.percent}>{item.progress}%</Text>
             </View>
-
-            <Text style={styles.cardTitle}>{item.title}</Text>
-
-            {!!item.target && <Text style={styles.metaText}>🎯 {item.target}</Text>}
-            {!!item.deadline && <Text style={styles.metaText}>📅 {item.deadline}</Text>}
 
             <View style={styles.progressBg}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${item.progress}%`,
-                    backgroundColor: getProgressColor(item.progress),
-                  },
-                ]}
-              />
+              <View style={[styles.progressFill, { width: `${item.progress}%` }]} />
             </View>
+
+            <Text style={styles.meta}>
+              {item.category}
+              {item.deadline ? ` · ${item.deadline}` : ''}
+            </Text>
 
             <View style={styles.controls}>
               <TouchableOpacity style={styles.controlButton} onPress={() => updateGoalProgress(item.id, -10)}>
@@ -162,53 +134,19 @@ export default function GoalsScreen() {
       />
 
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
-        <ScrollView style={styles.modal}>
+        <ScrollView style={styles.modal} contentContainerStyle={styles.modalContent}>
           <Text style={styles.modalTitle}>Новая цель</Text>
 
-          <Text style={styles.label}>Название</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Например: запустить Life OS"
-            value={title}
-            onChangeText={setTitle}
-          />
-
-          <Text style={styles.label}>Цель / результат</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Например: MVP до конца месяца"
-            value={target}
-            onChangeText={setTarget}
-          />
-
-          <Text style={styles.label}>Дедлайн</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Например: 30 июля 2026"
-            value={deadline}
-            onChangeText={setDeadline}
-          />
-
-          <Text style={styles.label}>Прогресс (%)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0"
-            keyboardType="numeric"
-            value={progress}
-            onChangeText={setProgress}
-          />
+          <Field label="Название" value={title} onChangeText={setTitle} placeholder="Например: запустить Life OS" />
+          <Field label="Результат" value={target} onChangeText={setTarget} placeholder="MVP до конца месяца" />
+          <Field label="Дедлайн" value={deadline} onChangeText={setDeadline} placeholder="30 июля" />
+          <Field label="Прогресс (%)" value={progress} onChangeText={setProgress} placeholder="0" keyboardType="numeric" />
 
           <Text style={styles.label}>Категория</Text>
-          <View style={styles.categories}>
+          <View style={styles.chips}>
             {categories.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.categoryButton, category === item && styles.categoryActive]}
-                onPress={() => setCategory(item)}
-              >
-                <Text style={[styles.categoryText, category === item && styles.categoryActiveText]}>
-                  {item}
-                </Text>
+              <TouchableOpacity key={item} style={[styles.chip, category === item && styles.chipActive]} onPress={() => setCategory(item)}>
+                <Text style={[styles.chipText, category === item && styles.chipTextActive]}>{item}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -217,13 +155,7 @@ export default function GoalsScreen() {
             <Text style={styles.saveButtonText}>Сохранить</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => {
-              resetForm();
-              setModalVisible(false);
-            }}
-          >
+          <TouchableOpacity style={styles.cancelButton} onPress={() => { resetForm(); setModalVisible(false); }}>
             <Text style={styles.cancelButtonText}>Отмена</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -232,98 +164,65 @@ export default function GoalsScreen() {
   );
 }
 
+function Stat({ title, value }: { title: string; value: string }) {
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statTitle}>{title}</Text>
+    </View>
+  );
+}
+
+function Field(props: any) {
+  return (
+    <>
+      <Text style={styles.label}>{props.label}</Text>
+      <TextInput style={styles.input} {...props} />
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: 20, paddingTop: 64, paddingBottom: 120 },
-  title: { fontSize: 30, fontWeight: '900', color: colors.text },
-  subtitle: { fontSize: 14, color: colors.muted, marginTop: 6, marginBottom: 22 },
+  content: { padding: 20, paddingTop: 64, paddingBottom: 130 },
 
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 14,
-  },
-  statValue: { fontSize: 20, fontWeight: '900', color: colors.text },
-  statLabel: { fontSize: 11, color: colors.muted, marginTop: 5 },
+  header: { marginBottom: 18 },
+  kicker: { fontSize: 12, fontWeight: '800', color: '#94A3B8', marginBottom: 5 },
+  title: { fontSize: 24, fontWeight: '900', color: '#0F172A' },
 
-  addButton: {
-    backgroundColor: colors.purple,
-    borderRadius: 18,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  addButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  statCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' },
+  statValue: { fontSize: 20, fontWeight: '900', color: '#0F172A' },
+  statTitle: { fontSize: 12, fontWeight: '700', color: '#64748B', marginTop: 5 },
 
-  sectionTitle: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 12 },
-  emptyText: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 20 },
+  primaryButton: { backgroundColor: '#0F172A', borderRadius: 18, padding: 15, alignItems: 'center', marginBottom: 22 },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  sectionTitle: { fontSize: 15, fontWeight: '900', color: '#0F172A', marginBottom: 10 },
 
-  card: { backgroundColor: colors.card, borderRadius: 22, padding: 16, marginBottom: 12 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  badge: {
-    backgroundColor: '#ede9fe',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  badgeText: { color: '#5b21b6', fontSize: 12, fontWeight: '800' },
-  progressText: { fontSize: 16, fontWeight: '900' },
-  cardTitle: { fontSize: 17, fontWeight: '900', color: colors.text, marginTop: 14 },
-  metaText: { fontSize: 13, color: colors.muted, marginTop: 8 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  goalTitle: { flex: 1, fontSize: 14, fontWeight: '900', color: '#0F172A', paddingRight: 10 },
+  percent: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
+  progressBg: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 999, overflow: 'hidden', marginTop: 14 },
+  progressFill: { height: '100%', backgroundColor: '#0F172A', borderRadius: 999 },
+  meta: { fontSize: 12, fontWeight: '700', color: '#94A3B8', marginTop: 10 },
+  controls: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  controlButton: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 14, padding: 10, alignItems: 'center' },
+  controlText: { color: '#0F172A', fontSize: 12, fontWeight: '900' },
+  empty: { fontSize: 13, fontWeight: '700', color: '#94A3B8', textAlign: 'center', marginTop: 20 },
 
-  progressBg: {
-    height: 9,
-    backgroundColor: colors.soft,
-    borderRadius: 999,
-    overflow: 'hidden',
-    marginTop: 16,
-  },
-  progressFill: { height: '100%', borderRadius: 999 },
-
-  controls: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  controlButton: {
-    flex: 1,
-    backgroundColor: colors.soft,
-    borderRadius: 14,
-    padding: 11,
-    alignItems: 'center',
-  },
-  controlText: { color: '#475569', fontWeight: '800' },
-
-  modal: { flex: 1, backgroundColor: '#fff', padding: 24, paddingTop: 70 },
-  modalTitle: { fontSize: 28, fontWeight: '900', color: colors.text, marginBottom: 20 },
-
-  label: { fontSize: 13, fontWeight: '700', color: colors.muted, marginTop: 18, marginBottom: 8 },
-  input: {
-    backgroundColor: colors.bg,
-    borderRadius: 16,
-    padding: 15,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-
-  categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  categoryButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 999,
-    backgroundColor: colors.soft,
-  },
-  categoryActive: { backgroundColor: colors.black },
-  categoryText: { color: colors.muted, fontWeight: '700' },
-  categoryActiveText: { color: '#fff' },
-
-  saveButton: {
-    backgroundColor: colors.black,
-    borderRadius: 18,
-    padding: 17,
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  cancelButton: { padding: 17, alignItems: 'center' },
-  cancelButtonText: { color: '#94a3b8', fontSize: 15, fontWeight: '700' },
+  modal: { flex: 1, backgroundColor: '#FFFFFF' },
+  modalContent: { padding: 24, paddingTop: 70, paddingBottom: 40 },
+  modalTitle: { fontSize: 24, fontWeight: '900', color: '#0F172A', marginBottom: 18 },
+  label: { fontSize: 12, fontWeight: '900', color: '#64748B', marginTop: 18, marginBottom: 8 },
+  input: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 15, fontSize: 15, borderWidth: 1, borderColor: '#E2E8F0', color: '#0F172A' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 999, backgroundColor: '#F1F5F9' },
+  chipActive: { backgroundColor: '#0F172A' },
+  chipText: { color: '#64748B', fontSize: 12, fontWeight: '900' },
+  chipTextActive: { color: '#FFFFFF' },
+  saveButton: { backgroundColor: '#0F172A', borderRadius: 18, padding: 16, alignItems: 'center', marginTop: 26 },
+  saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  cancelButton: { padding: 16, alignItems: 'center' },
+  cancelButtonText: { color: '#94A3B8', fontSize: 14, fontWeight: '800' },
 });

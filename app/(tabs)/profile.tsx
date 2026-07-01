@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AppCard } from '@/components/ui/AppCard';
-import { AppHeader } from '@/components/ui/AppHeader';
 import { colors } from '@/constants/colors';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -12,19 +10,14 @@ export default function ProfileScreen() {
   const goals = useAppStore((state) => state.goals);
 
   const stats = useMemo(() => {
-    const income = finance
-      .filter((item) => item.type === 'income')
-      .reduce((sum, item) => sum + item.amount, 0);
-
-    const expense = finance
-      .filter((item) => item.type === 'expense')
-      .reduce((sum, item) => sum + item.amount, 0);
+    const income = finance.filter((i) => i.type === 'income').reduce((s, i) => s + i.amount, 0);
+    const expense = finance.filter((i) => i.type === 'expense').reduce((s, i) => s + i.amount, 0);
 
     return {
       balance: income - expense,
-      expense,
-      ideasCount: ideas.length,
-      activeGoals: goals.filter((goal) => goal.progress < 100).length,
+      ideas: ideas.length,
+      goals: goals.filter((g) => g.progress < 100).length,
+      records: finance.length,
     };
   }, [finance, ideas, goals]);
 
@@ -34,108 +27,116 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <AppHeader title="👤 Я" subtitle="Личный центр управления Life OS" />
+      <View style={styles.header}>
+        <Text style={styles.kicker}>Аккаунт</Text>
+        <Text style={styles.title}>Профиль</Text>
+      </View>
 
-      <AppCard style={styles.profileCard}>
+      <View style={styles.profileCard}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>A</Text>
         </View>
 
-        <Text style={styles.name}>Адиль</Text>
-        <Text style={styles.role}>Life OS · v0.3</Text>
-      </AppCard>
+        <View style={styles.profileInfo}>
+          <Text style={styles.name}>Адиль</Text>
+          <Text style={styles.role}>Life OS · минимальный режим</Text>
+        </View>
+      </View>
 
       <Text style={styles.sectionTitle}>Статистика</Text>
 
       <View style={styles.grid}>
-        <AppCard style={styles.statCard}>
-          <Text style={styles.statIcon}>💰</Text>
-          <Text style={styles.statValue}>{money(stats.balance)}</Text>
-          <Text style={styles.statLabel}>Баланс</Text>
-        </AppCard>
-
-        <AppCard style={styles.statCard}>
-          <Text style={styles.statIcon}>💡</Text>
-          <Text style={styles.statValue}>{stats.ideasCount}</Text>
-          <Text style={styles.statLabel}>Идей</Text>
-        </AppCard>
-
-        <AppCard style={styles.statCard}>
-          <Text style={styles.statIcon}>🎯</Text>
-          <Text style={styles.statValue}>{stats.activeGoals}</Text>
-          <Text style={styles.statLabel}>Активных целей</Text>
-        </AppCard>
-
-        <AppCard style={styles.statCard}>
-          <Text style={styles.statIcon}>📉</Text>
-          <Text style={styles.statValue}>{money(stats.expense)}</Text>
-          <Text style={styles.statLabel}>Расходы</Text>
-        </AppCard>
+        <Stat title="Баланс" value={money(stats.balance)} />
+        <Stat title="Финансы" value={`${stats.records}`} />
+        <Stat title="Идеи" value={`${stats.ideas}`} />
+        <Stat title="Цели" value={`${stats.goals}`} />
       </View>
 
       <Text style={styles.sectionTitle}>Настройки</Text>
 
-      <AppCard>
-        <SettingsRow icon="💵" title="Валюта" value="₸ KZT" />
-        <View style={styles.divider} />
-        <SettingsRow icon="🌙" title="Тема" value="Светлая" />
-        <View style={styles.divider} />
-        <SettingsRow icon="🔔" title="Уведомления" value="Скоро" />
-        <View style={styles.divider} />
-        <SettingsRow icon="☁️" title="Резервная копия" value="Скоро" />
-      </AppCard>
+      <View style={styles.settingsCard}>
+        <Row title="Валюта" value="KZT" />
+        <Divider />
+        <Row title="Тема" value="Светлая" />
+        <Divider />
+        <Row title="Уведомления" value="Скоро" />
+        <Divider />
+        <Row title="Резервная копия" value="Скоро" />
+      </View>
     </ScrollView>
   );
 }
 
-function SettingsRow({ icon, title, value }: { icon: string; title: string; value: string }) {
+function Stat({ title, value }: { title: string; value: string }) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowIcon}>{icon}</Text>
-      <View style={styles.rowInfo}>
-        <Text style={styles.rowTitle}>{title}</Text>
-      </View>
-      <Text style={styles.settingValue}>{value}</Text>
+    <View style={styles.statCard}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statTitle}>{title}</Text>
     </View>
   );
 }
 
+function Row({ title, value }: { title: string; value: string }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowTitle}>{title}</Text>
+      <Text style={styles.rowValue}>{value}</Text>
+    </View>
+  );
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: 20, paddingTop: 64, paddingBottom: 120 },
+  content: { padding: 20, paddingTop: 64, paddingBottom: 130 },
 
-  profileCard: { alignItems: 'center' },
+  header: { marginBottom: 18 },
+  kicker: { fontSize: 12, fontWeight: '800', color: '#94A3B8', marginBottom: 5 },
+  title: { fontSize: 24, fontWeight: '900', color: '#0F172A' },
+
+  profileCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 26,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.black,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginRight: 14,
   },
-  avatarText: { color: '#fff', fontSize: 28, fontWeight: '900' },
-  name: { fontSize: 24, fontWeight: '900', color: colors.text },
-  role: { fontSize: 13, color: colors.muted, marginTop: 4 },
+  avatarText: { fontSize: 24, fontWeight: '900', color: '#0F172A' },
+  profileInfo: { flex: 1 },
+  name: { fontSize: 20, fontWeight: '900', color: '#FFFFFF' },
+  role: { fontSize: 13, fontWeight: '700', color: '#CBD5E1', marginTop: 4 },
 
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: colors.text,
-    marginTop: 26,
-    marginBottom: 12,
+  sectionTitle: { fontSize: 15, fontWeight: '900', color: '#0F172A', marginBottom: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  statCard: {
+    width: '48.5%',
+    minHeight: 92,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'space-between',
   },
+  statValue: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
+  statTitle: { fontSize: 12, fontWeight: '700', color: '#94A3B8', marginTop: 8 },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statCard: { width: '48%', minHeight: 120 },
-  statIcon: { fontSize: 22, marginBottom: 12 },
-  statValue: { fontSize: 17, fontWeight: '900', color: colors.text },
-  statLabel: { fontSize: 12, color: colors.muted, marginTop: 5 },
-
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
-  rowIcon: { fontSize: 22, marginRight: 12 },
-  rowInfo: { flex: 1 },
-  rowTitle: { fontSize: 14, fontWeight: '900', color: colors.text },
-  settingValue: { fontSize: 13, fontWeight: '800', color: colors.muted },
-  divider: { height: 1, backgroundColor: colors.soft, marginVertical: 12 },
+  settingsCard: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  rowTitle: { fontSize: 14, fontWeight: '900', color: '#0F172A' },
+  rowValue: { fontSize: 13, fontWeight: '800', color: '#94A3B8' },
+  divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 12 },
 });
